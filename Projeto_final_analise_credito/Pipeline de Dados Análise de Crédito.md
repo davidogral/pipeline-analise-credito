@@ -2,7 +2,7 @@
 
 ## Descrição
 
-[Breve descrição do projeto e problema que está resolvendo]
+O problema do negócio é a ineficiência e o risco associados ao processo de análise de crédito para novos solicitantes de cartão. Instituições financeiras enfrentam o desafio de avaliar um grande volume de solicitações de forma rápida e precisa. Processos manuais são lentos, caros, de difícil escalabilidade e suscetíveis a erros humanos o que aumenta a exposição da empresa a riscos financeiros.
 
 ## Estrutura de Dados
 
@@ -70,3 +70,4 @@ import sqlite3
 conn = sqlite3.connect('data/pipeline.db')
 # suas queries aqui
 ```
+
