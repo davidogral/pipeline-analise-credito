@@ -48,9 +48,9 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 
 ## Qualidade dos Dados
 
-* Completude: XXX%
-* Unicidade: XXX%
-* Score Geral: XXX%
+* Completude: 100%
+* Unicidade: 100%
+* Score Geral: 100%
 
 ## Como Executar
 
@@ -70,4 +70,5 @@ import sqlite3
 conn = sqlite3.connect('data/pipeline.db')
 # suas queries aqui
 ```
+
 
