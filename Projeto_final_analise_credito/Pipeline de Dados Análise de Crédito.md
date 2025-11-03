@@ -31,9 +31,9 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 * Descrição: Dados agregados para análise
 * Arquivos:
 
-  * `metricas_diarias.csv`
+  * `ativos_patrimonio.csv`
   * `analise_clientes.csv`
-  * `desempenho_produtos.csv`
+  * `metricas_estado.csv`
 
 ## Banco de Dados
 
@@ -70,5 +70,6 @@ import sqlite3
 conn = sqlite3.connect('data/pipeline.db')
 # suas queries aqui
 ```
+
 
 
