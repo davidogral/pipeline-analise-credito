@@ -19,16 +19,18 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 * Arquivo: `dados_limpos.csv`
 * Transformações aplicadas:
 
-  1. Remoção de duplicatas
-  2. Tratamento de valores nulos
-  3. Conversão de tipos
-  4. Padronização de valores
-  5. Remoção de outliers
+  1. Alteração dos tipos de dados
+  2. Padronização dos valores textuais
+  3. Tratamento de valores nulos
+  4. Tratamento de outliers
+  5. Tratamento de duplicatas
+  6. Criação da coluna Renda_Total
+  7. Pós análise exploratória
 
 ### Camada Gold
 
 * Localização: `data/gold/`
-* Descrição: Dados agregados para análise
+* Descrição: Dados agregados para análise.
 * Arquivos:
 
   * `ativos_patrimonio.csv`
@@ -70,6 +72,7 @@ import sqlite3
 conn = sqlite3.connect('data/pipeline.db')
 # suas queries aqui
 ```
+
 
 
 
