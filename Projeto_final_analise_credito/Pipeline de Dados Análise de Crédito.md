@@ -74,9 +74,7 @@ conn = sqlite3.connect('data/pipeline - Copia.db')
 def run(sql):
     return pd.read_sql_query(sql, conn)
     
-# ==========================================
 # QUERY 1: Visão Geral dos Dados
-# ==========================================
 query = """
 SELECT COUNT(*) as total_registros
 FROM projeto_final
@@ -84,9 +82,7 @@ FROM projeto_final
 resultado = pd.read_sql_query(query, conn)
 print("Total de registros:", resultado['total_registros'].values[0])
 
-# ==========================================
 # QUERY 2: Top 10 clientes com maior renda
-# ==========================================
 query_top_rendas = """
 SELECT CODIGO_CLIENTE, RENDA_TOTAL
 FROM projeto_final
@@ -94,12 +90,9 @@ ORDER BY RENDA_TOTAL DESC
 LIMIT 11;
 """
 resultado = pd.read_sql_query(query_top_rendas, conn)
-
 print(resultado)
 
-# ==========================================
 # QUERY 3: Distribuição de score (quantos clientes por faixa)
-# ==========================================
 query = """
 SELECT
     CASE
