@@ -66,13 +66,53 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 
 2. Consulte o banco de dados:
 
-```python
+import pandas as pd
 import sqlite3
-conn = sqlite3.connect('bd/pipeline.db')
-# suas queries aqui
-```
+import sqlite3
+# Conectar ao banco
+conn = sqlite3.connect('data/pipeline - Copia.db')
+def run(sql):
+    return pd.read_sql_query(sql, conn)
+    
+# ==========================================
+# QUERY 1: Visão Geral dos Dados
+# ==========================================
+query = """
+SELECT COUNT(*) as total_registros
+FROM projeto_final
+"""
+resultado = pd.read_sql_query(query, conn)
+print("Total de registros:", resultado['total_registros'].values[0])
 
+# ==========================================
+# QUERY 2: Top 10 clientes com maior renda
+# ==========================================
+query_top_rendas = """
+SELECT CODIGO_CLIENTE, RENDA_TOTAL
+FROM projeto_final
+ORDER BY RENDA_TOTAL DESC
+LIMIT 11;
+"""
+resultado = pd.read_sql_query(query_top_rendas, conn)
 
+print(resultado)
 
-
-
+# ==========================================
+# QUERY 3: Distribuição de score (quantos clientes por faixa)
+# ==========================================
+query = """
+SELECT
+    CASE
+        WHEN SCORE < 25 THEN 'Baixo (0-24)'
+        WHEN SCORE BETWEEN 25 AND 49 THEN 'Regular (25-49)'
+        WHEN SCORE BETWEEN 50 AND 74 THEN 'Bom (50-74)'
+        ELSE 'Excelente (75-100)'
+    END AS faixa_score,
+    COUNT(*) AS total_clientes
+FROM projeto_final
+GROUP BY faixa_score
+ORDER BY total_clientes DESC
+"""
+score_faixas = pd.read_sql_query(query, conn)
+print("\nDistribuição por faixa de score:")
+print(score_faixas)
