@@ -40,13 +40,12 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 ## Banco de Dados
 
 * Tipo: SQLite
-* Localização: `data/pipeline.db`
+* Localização: `db/pipeline.db`
 * Tabelas:
 
-  * `tabela_principal`: Dados completos limpos
-  * `clientes`: Informações de clientes
-  * `produtos`: Catálogo de produtos
-  * `metricas_diarias`: Agregações diárias
+  * `projeto_final`: Dados completos limpos
+  * `metricas_estado`: dados relacionados ao estado
+  * `ativos_patrimonio`: dados sobre o patromonio
 
 ## Qualidade dos Dados
 
@@ -69,9 +68,10 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 
 ```python
 import sqlite3
-conn = sqlite3.connect('data/pipeline.db')
+conn = sqlite3.connect('bd/pipeline.db')
 # suas queries aqui
 ```
+
 
 
 
