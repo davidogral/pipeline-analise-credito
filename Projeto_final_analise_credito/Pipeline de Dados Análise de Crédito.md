@@ -19,32 +19,33 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 * Arquivo: `dados_limpos.csv`
 * Transformações aplicadas:
 
-  1. Remoção de duplicatas
-  2. Tratamento de valores nulos
-  3. Conversão de tipos
-  4. Padronização de valores
-  5. Remoção de outliers
+  1. Alteração dos tipos de dados
+  2. Padronização dos valores textuais
+  3. Tratamento de valores nulos
+  4. Tratamento de outliers
+  5. Tratamento de duplicatas
+  6. Criação da coluna Renda_Total
+  7. Pós análise exploratória
 
 ### Camada Gold
 
 * Localização: `data/gold/`
-* Descrição: Dados agregados para análise
+* Descrição: Dados agregados para análise.
 * Arquivos:
 
-  * `metricas_diarias.csv`
+  * `ativos_patrimonio.csv`
   * `analise_clientes.csv`
-  * `desempenho_produtos.csv`
+  * `metricas_estado.csv`
 
 ## Banco de Dados
 
 * Tipo: SQLite
-* Localização: `data/pipeline.db`
+* Localização: `db/pipeline.db`
 * Tabelas:
 
-  * `tabela_principal`: Dados completos limpos
-  * `clientes`: Informações de clientes
-  * `produtos`: Catálogo de produtos
-  * `metricas_diarias`: Agregações diárias
+  * `projeto_final`: Dados completos limpos
+  * `metricas_estado`: dados relacionados ao estado
+  * `ativos_patrimonio`: dados sobre o patromonio
 
 ## Qualidade dos Dados
 
@@ -65,10 +66,46 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 
 2. Consulte o banco de dados:
 
-```python
+import pandas as pd
 import sqlite3
-conn = sqlite3.connect('data/pipeline.db')
-# suas queries aqui
-```
+import sqlite3
+# Conectar ao banco
+conn = sqlite3.connect('data/pipeline - Copia.db')
+def run(sql):
+    return pd.read_sql_query(sql, conn)
+    
+# QUERY 1: Visão Geral dos Dados
+query = """
+SELECT COUNT(*) as total_registros
+FROM projeto_final
+"""
+resultado = pd.read_sql_query(query, conn)
+print("Total de registros:", resultado['total_registros'].values[0])
 
+# QUERY 2: Top 10 clientes com maior renda
+query_top_rendas = """
+SELECT CODIGO_CLIENTE, RENDA_TOTAL
+FROM projeto_final
+ORDER BY RENDA_TOTAL DESC
+LIMIT 11;
+"""
+resultado = pd.read_sql_query(query_top_rendas, conn)
+print(resultado)
 
+# QUERY 3: Distribuição de score (quantos clientes por faixa)
+query = """
+SELECT
+    CASE
+        WHEN SCORE < 25 THEN 'Baixo (0-24)'
+        WHEN SCORE BETWEEN 25 AND 49 THEN 'Regular (25-49)'
+        WHEN SCORE BETWEEN 50 AND 74 THEN 'Bom (50-74)'
+        ELSE 'Excelente (75-100)'
+    END AS faixa_score,
+    COUNT(*) AS total_clientes
+FROM projeto_final
+GROUP BY faixa_score
+ORDER BY total_clientes DESC
+"""
+score_faixas = pd.read_sql_query(query, conn)
+print("\nDistribuição por faixa de score:")
+print(score_faixas)
