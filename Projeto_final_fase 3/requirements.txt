@@ -1,0 +1,6 @@
+pyspark
+openpyxl
+matplotlib
+seaborn
+numpy
+psycopg2-binary

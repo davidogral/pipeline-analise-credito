@@ -66,11 +66,19 @@ O problema do negócio é a ineficiência e o risco associados ao processo de an
 
 2. Consulte o banco de dados:
 
+import os
 import pandas as pd
-import sqlite3
-import sqlite3
-# Conectar ao banco
-conn = sqlite3.connect('data/pipeline - Copia.db')
+import psycopg2
+
+# Conectar ao banco PostgreSQL (ajuste as variáveis de ambiente conforme necessário)
+conn = psycopg2.connect(
+    host=os.getenv("PGHOST", "localhost"),
+    port=os.getenv("PGPORT", "5432"),
+    dbname=os.getenv("PGDATABASE", "pipeline"),
+    user=os.getenv("PGUSER", "postgres"),
+    password=os.getenv("PGPASSWORD", "postgres"),
+)
+
 def run(sql):
     return pd.read_sql_query(sql, conn)
     
