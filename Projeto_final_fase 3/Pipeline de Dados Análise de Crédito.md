@@ -70,7 +70,8 @@ import os
 import pandas as pd
 import psycopg2
 
-# Conectar ao banco PostgreSQL (ajuste as variáveis de ambiente conforme necessário)
+## Conectar ao banco PostgreSQL 
+```bash
 conn = psycopg2.connect(
     host=os.getenv("PGHOST", "localhost"),
     port=os.getenv("PGPORT", "5432"),
@@ -81,7 +82,8 @@ conn = psycopg2.connect(
 
 def run(sql):
     return pd.read_sql_query(sql, conn)
-    
+```
+```bash
 # QUERY 1: Visão Geral dos Dados
 query = """
 SELECT COUNT(*) as total_registros
@@ -117,3 +119,58 @@ ORDER BY total_clientes DESC
 score_faixas = pd.read_sql_query(query, conn)
 print("\nDistribuição por faixa de score:")
 print(score_faixas)
+```
+
+# Pipeline de Dados - Fase 03
+
+## Arquitetura
+
+### Processamento
+- Apache Spark: processamento distribuído
+- Parquet: formato de armazenamento
+- Camadas: Bronze/Silver/Gold
+
+### Armazenamento
+- Data Lake: AWS S3 / Azure Blob Storage
+- Data Warehouse: PostgreSQL
+- Formato: Parquet (mais eficiente que CSV)
+
+### Orquestração
+- Apache Airflow para automação
+- Execução: Diária
+- Monitoramento via Airflow UI
+
+## Estrutura de Dados
+
+### Data Lake (Cloud)
+- Bronze: `s3://bucket/bronze/` ou `azure://container/bronze/`
+- Silver: `s3://bucket/silver/` ou `azure://container/silver/`
+- Gold: `s3://bucket/gold/` ou `azure://container/gold/`
+
+### Data Warehouse (PostgreSQL)
+- Tabela: `vendas` (fato principal)
+- Tabela: `clientes` (dimensão)
+- Tabela: `produtos` (dimensão)
+- Tabela: `metricas_diarias` (agregações)
+
+## Como Executar
+
+### 1. Processar com Spark
+```bash
+# Executar notebooks na ordem
+01_spark_bronze_layer.ipynb
+02_spark_silver_layer.ipynb
+03_spark_gold_layer.ipyn
+```
+
+### 2. Carregar no Banco
+```bash
+04_create_database_schema.ipynb
+05_load_to_postgres.ipynb
+```
+
+### 3. Executar Airflow
+```bash
+docker-compose up -d
+# Acessar: http://localhost:808
+```
