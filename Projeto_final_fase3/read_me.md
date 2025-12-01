@@ -55,7 +55,7 @@ python scripts/06_quality_report.py  # gera quality_report.png
 python scripts/Ml_score.py           # exploração + modelo de regressão
 ```
 
-## Orquestração com Airflow (opcional)
+## Orquestração com Airflow 
 Instale o Airflow no mesmo `venv` (exemplo com Python 3.10):
 ```bash
 export AIRFLOW_HOME=$(pwd)/airflow_home
