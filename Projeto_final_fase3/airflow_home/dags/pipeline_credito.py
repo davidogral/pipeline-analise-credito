@@ -4,12 +4,10 @@ from datetime import datetime
 
 # Diretório base do projeto
 BASE_DIR = "/Users/davispecia/Documents/GitHub/Pf_pipeline_dados/Projeto_final_fase3"
-# Comandos comuns: ativar venv, setar Java 17 e variáveis do Postgres (porta 5433)
+# Comandos comuns: ativar venv e setar variáveis do Postgres (porta 5433)
 ENV = (
     f"cd {BASE_DIR} && "
     f"source {BASE_DIR}/venv/bin/activate && "
-    "export JAVA_HOME=$( /usr/libexec/java_home -v 17 ) && "
-    "export PATH=\"$JAVA_HOME/bin:$PATH\" && "
     "export PGHOST=localhost PGPORT=5433 PGDATABASE=pipeline PGUSER=postgres PGPASSWORD=postgres && "
     f"cd {BASE_DIR}"
 )

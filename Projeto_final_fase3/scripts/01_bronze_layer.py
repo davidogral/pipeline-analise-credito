@@ -1,84 +1,72 @@
-from pathlib import Path
-from openpyxl import load_workbook
-from pyspark.sql import functions as F
-from pyspark.sql import types as T
-from spark_utils import get_spark, write_single_csv
+import sys as _sys
+from pathlib import Path as _Path
 
-spark = get_spark("BronzeLayer")
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from pandas_utils import write_single_csv
+
 raw_file = Path("data/raw/dados_credito.xlsx")
 if not raw_file.exists():
     raise FileNotFoundError(f"Arquivo não encontrado: {raw_file}")
 
-schema = T.StructType([
-    T.StructField("CODIGO_CLIENTE", T.LongType(), True),
-    T.StructField("UF", T.StringType(), True),
-    T.StructField("IDADE", T.IntegerType(), True),
-    T.StructField("ESCOLARIDADE", T.StringType(), True),
-    T.StructField("ESTADO_CIVIL", T.StringType(), True),
-    T.StructField("QT_FILHOS", T.IntegerType(), True),
-    T.StructField("CASA_PROPRIA", T.StringType(), True),
-    T.StructField("QT_IMOVEIS", T.IntegerType(), True),
-    T.StructField("VL_IMOVEIS", T.DoubleType(), True),
-    T.StructField("OUTRA_RENDA", T.StringType(), True),
-    T.StructField("OUTRA_RENDA_VALOR", T.DoubleType(), True),
-    T.StructField("TEMPO_ULTIMO_EMPREGO_MESES", T.IntegerType(), True),
-    T.StructField("TRABALHANDO_ATUALMENTE", T.StringType(), True),
-    T.StructField("ULTIMO_SALARIO", T.DoubleType(), True),
-    T.StructField("QT_CARROS", T.IntegerType(), True),
-    T.StructField("VALOR_TABELA_CARROS", T.DoubleType(), True),
-    T.StructField("SCORE", T.DoubleType(), True)
-])
+schema = {
+    "CODIGO_CLIENTE": "Int64",
+    "UF": "string",
+    "IDADE": "Int32",
+    "ESCOLARIDADE": "string",
+    "ESTADO_CIVIL": "string",
+    "QT_FILHOS": "Int32",
+    "CASA_PROPRIA": "string",
+    "QT_IMOVEIS": "Int32",
+    "VL_IMOVEIS": "float64",
+    "OUTRA_RENDA": "string",
+    "OUTRA_RENDA_VALOR": "float64",
+    "TEMPO_ULTIMO_EMPREGO_MESES": "Int32",
+    "TRABALHANDO_ATUALMENTE": "string",
+    "ULTIMO_SALARIO": "float64",
+    "QT_CARROS": "Int32",
+    "VALOR_TABELA_CARROS": "float64",
+    "SCORE": "float64",
+}
 
 for folder in [Path("data/bronze"), Path("data/silver"), Path("data/gold")]:
     folder.mkdir(parents=True, exist_ok=True)
 print("Estrutura de diretórios verificada.")
 
-wb = load_workbook(raw_file, data_only=True)
-sheet = wb.active
-rows_iter = sheet.iter_rows(values_only=True)
-headers = [str(value).strip() for value in next(rows_iter)]
-records = [dict(zip(headers, row)) for row in rows_iter if any(row)]
+raw_df = pd.read_excel(raw_file, engine="openpyxl")
+raw_df.columns = [str(column).strip() for column in raw_df.columns]
+raw_df = raw_df.dropna(how="all")
 
-blank_markers = {"", "None", "NULL"}
+blank_markers = ["", "None", "NULL"]
 
-def cast_value(value, data_type):
-    if value is None:
-        return None
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if cleaned in blank_markers:
-            return None
-        value = cleaned
-    try:
-        if isinstance(data_type, T.IntegralType):
-            return int(float(value))
-        if isinstance(data_type, T.FractionalType):
-            return float(value)
-    except (ValueError, TypeError):
-        return None
-    return str(value)
+def cast_column(series: pd.Series, dtype: str) -> pd.Series:
+    cleaned = series.map(lambda value: value.strip() if isinstance(value, str) else value)
+    cleaned = cleaned.replace(blank_markers, np.nan)
+    if dtype.startswith("Int"):
+        numeric = pd.to_numeric(cleaned, errors="coerce")
+        return np.trunc(numeric).astype("Float64").astype(dtype)
+    if dtype == "float64":
+        return pd.to_numeric(cleaned, errors="coerce").astype("float64")
+    return cleaned.astype("string")
 
-clean_records = []
-for record in records:
-    sanitized = {}
-    for field in schema:
-        sanitized[field.name] = cast_value(record.get(field.name), field.dataType)
-    clean_records.append(sanitized)
+df = pd.DataFrame({
+    column: cast_column(raw_df.get(column, pd.Series(index=raw_df.index, dtype="object")), dtype)
+    for column, dtype in schema.items()
+})
+print(f"Dimensão inicial do dataset: {df.shape}")
+print(df.dtypes.to_string())
 
-df = spark.createDataFrame(clean_records, schema=schema)
-print(f"Dimensão inicial do dataset: ({df.count()}, {len(df.columns)})")
-df.printSchema()
+print(df.describe(include="all").transpose().to_string())
+null_overview = df.isna().sum().to_frame("nulos").transpose()
+print(null_overview.to_string())
 
-df.describe().show(truncate=False)
-null_overview = df.select([F.count(F.when(F.col(c).isNull(), 1)).alias(c) for c in df.columns])
-null_overview.show(truncate=False)
-
-df = (
-    df.withColumn("DATA_UPLOAD", F.current_timestamp())
-      .withColumn("ARQUIVO_FONTE", F.lit(raw_file.name))
-)
+df["DATA_UPLOAD"] = pd.Timestamp.utcnow().tz_localize(None)
+df["ARQUIVO_FONTE"] = raw_file.name
 
 bronze_path = "data/bronze/dados_brutos.csv"
 write_single_csv(df, bronze_path)
 print(f">>> Bronze salvo em: {bronze_path}")
-df.show(5, truncate=False)
+print(df.head().to_string())

@@ -1,16 +1,14 @@
-import matplotlib.pyplot as plt
-from pyspark.sql import functions as F
-from spark_utils import get_spark
+import sys as _sys
+from pathlib import Path as _Path
 
-spark = get_spark("QualityReport")
-df = (
-    spark.read
-    .option("header", True)
-    .option("inferSchema", True)
-    .csv("data/gold/dados_gold.csv")
-    .cache()
-)
-record_count = df.count()
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from pandas_utils import read_layer_csv
+
+df = read_layer_csv("data/gold/dados_gold.csv")
+record_count = len(df)
 column_count = len(df.columns)
 print("=" * 50)
 print("RELATÓRIO DE QUALIDADE DE DADOS")
@@ -19,8 +17,7 @@ print(f"Total de registros: {record_count} | Total de colunas: {column_count}")
 
 print("1. COMPLETUDE DOS DADOS")
 print("-" * 50)
-filled_counts_row = df.select([F.count(F.col(c)).alias(c) for c in df.columns]).collect()[0]
-filled_counts = filled_counts_row.asDict()
+filled_counts = df.notna().sum().to_dict()
 completude_por_coluna = {}
 for coluna, preenchidos in filled_counts.items():
     percentual = (preenchidos / record_count * 100) if record_count else 0
@@ -34,7 +31,7 @@ print(f"Completude Geral: {completude_geral:.2f}%")
 
 print("2. UNICIDADE DOS DADOS")
 print("-" * 50)
-distinct_count = df.dropDuplicates().count()
+distinct_count = len(df.drop_duplicates())
 duplicatas = record_count - distinct_count
 unicidade = ((record_count - duplicatas) / record_count * 100) if record_count else 0
 print(f"Linhas únicas: {unicidade:.2f}%")
@@ -49,7 +46,8 @@ numeric_cols = [
 ]
 for coluna in numeric_cols:
     if coluna in df.columns:
-        negativos = df.filter(F.col(coluna) < 0).count()
+        valores = pd.to_numeric(df[coluna], errors="coerce")
+        negativos = int((valores < 0).sum())
         print(f"{coluna}: {negativos} valores negativos encontrados")
 
 print("4. VALIDADE DOS DADOS")
@@ -69,7 +67,8 @@ validacoes = {
 }
 for coluna, (min_val, max_val) in validacoes.items():
     if coluna in df.columns:
-        fora_range = df.filter((F.col(coluna) < min_val) | (F.col(coluna) > max_val)).count()
+        valores = pd.to_numeric(df[coluna], errors="coerce")
+        fora_range = int(((valores < min_val) | (valores > max_val)).sum())
         print(f"{coluna}: {fora_range} valores fora do intervalo válido ({min_val} – {max_val})")
     else:
         print(f"{coluna}: coluna não encontrada no DataFrame.")

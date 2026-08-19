@@ -1,20 +1,10 @@
 import os
-from typing import List, Sequence, Optional
+from typing import Any, List, Optional
 
+import numpy as np
+import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
-from pyspark.sql import DataFrame
-
-
-TYPE_MAPPING = {
-    "StringType": "TEXT",
-    "IntegerType": "INTEGER",
-    "LongType": "BIGINT",
-    "DoubleType": "DOUBLE PRECISION",
-    "FloatType": "REAL",
-    "BooleanType": "BOOLEAN",
-    "TimestampType": "TIMESTAMP",
-}
 
 
 def get_pg_connection():
@@ -39,26 +29,52 @@ def _qualified_table(table_name: str, schema: Optional[str]) -> str:
     return f'"{table_name}"'
 
 
+def _pg_type(dtype) -> str:
+    """Map a pandas dtype to the closest PostgreSQL column type."""
+    if pd.api.types.is_bool_dtype(dtype):
+        return "BOOLEAN"
+    if pd.api.types.is_integer_dtype(dtype):
+        return "BIGINT"
+    if pd.api.types.is_float_dtype(dtype):
+        return "DOUBLE PRECISION"
+    if pd.api.types.is_datetime64_any_dtype(dtype):
+        return "TIMESTAMP"
+    return "TEXT"
+
+
+def _to_python(value: Any) -> Any:
+    """Convert a pandas/numpy scalar into something psycopg2 knows how to adapt."""
+    if value is None:
+        return None
+    if isinstance(value, np.generic):
+        value = value.item()
+    if isinstance(value, pd.Timestamp):
+        return None if pd.isna(value) else value.to_pydatetime()
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    return value
+
+
 def persist_dataframe(
-    df: DataFrame,
+    df: pd.DataFrame,
     table_name: str,
     connection,
     schema: Optional[str] = "public",
 ) -> None:
     """
-    Drops and recreates table_name in PostgreSQL, inserting all rows from the Spark DataFrame.
+    Drops and recreates table_name in PostgreSQL, inserting all rows from the DataFrame.
     """
-    fields = []
-    for field in df.schema:
-        data_type = TYPE_MAPPING.get(type(field.dataType).__name__, "TEXT")
-        fields.append(f'"{field.name}" {data_type}')
+    fields = [f'"{column}" {_pg_type(dtype)}' for column, dtype in df.dtypes.items()]
     ddl = f"CREATE TABLE {_qualified_table(table_name, schema)} ({', '.join(fields)})"
-    rows = [tuple(row[col] for col in df.columns) for row in df.collect()]
+    rows = [tuple(_to_python(value) for value in row) for row in df.itertuples(index=False, name=None)]
     with connection.cursor() as cursor:
         cursor.execute(f"DROP TABLE IF EXISTS {_qualified_table(table_name, schema)} CASCADE;")
         cursor.execute(ddl)
         if rows:
-            column_list = ", ".join(f'"{col}"' for col in df.columns)
+            column_list = ", ".join(f'"{column}"' for column in df.columns)
             insert_sql = f"INSERT INTO {_qualified_table(table_name, schema)} ({column_list}) VALUES %s"
             execute_values(cursor, insert_sql, rows)
     print(f"Tabela {table_name} criada: {len(rows)} registros")

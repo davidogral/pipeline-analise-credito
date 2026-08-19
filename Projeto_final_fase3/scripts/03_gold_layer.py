@@ -1,109 +1,104 @@
-from pathlib import Path
-from pyspark.sql import functions as F
-from spark_utils import get_spark, write_single_csv
+import sys as _sys
+from pathlib import Path as _Path
 
-spark = get_spark("GoldLayer")
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from pandas_utils import read_layer_csv, write_single_csv
 
 silver_file = Path("data/silver/dados_limpos.csv")
-df = (
-    spark.read
-    .option("header", True)
-    .option("inferSchema", True)
-    .csv(str(silver_file))
-    .cache()
-)
-print(f"Silver carregado ({df.count()} registros).")
+df = read_layer_csv(silver_file)
+print(f"Silver carregado ({len(df)} registros).")
 
-idade_expr = (
-    F.when(F.col("IDADE") <= 20, "Até 20")
-     .when((F.col("IDADE") > 20) & (F.col("IDADE") <= 30), "21 a 30")
-     .when((F.col("IDADE") > 30) & (F.col("IDADE") <= 45), "31 a 45")
-     .when((F.col("IDADE") > 45) & (F.col("IDADE") <= 55), "46 a 55")
-     .otherwise("Maior que 55")
-)
-df = df.withColumn("FAIXA_ETARIA", idade_expr)
-df.groupBy("FAIXA_ETARIA").count().show()
+idade = pd.to_numeric(df["IDADE"], errors="coerce")
+faixa_condicoes = [
+    idade <= 20,
+    (idade > 20) & (idade <= 30),
+    (idade > 30) & (idade <= 45),
+    (idade > 45) & (idade <= 55),
+]
+faixa_valores = ["Até 20", "21 a 30", "31 a 45", "46 a 55"]
+df["FAIXA_ETARIA"] = np.select(faixa_condicoes, faixa_valores, default="Maior que 55")
+print(df["FAIXA_ETARIA"].value_counts().to_string())
 
-df = df.withColumn(
-    "TEM_FILHOS",
-    F.when(F.col("QT_FILHOS") > 0, F.lit("Sim")).otherwise(F.lit("Não"))
-)
-df.groupBy("TEM_FILHOS").count().show()
+df["TEM_FILHOS"] = np.where(pd.to_numeric(df["QT_FILHOS"], errors="coerce") > 0, "Sim", "Não")
+print(df["TEM_FILHOS"].value_counts().to_string())
 
-df = df.withColumn(
-    "RENDA_TOTAL",
-    F.coalesce(F.col("ULTIMO_SALARIO"), F.lit(0.0)) + F.coalesce(F.col("OUTRA_RENDA_VALOR"), F.lit(0.0))
-)
-df.select("RENDA_TOTAL").summary().show()
+df["RENDA_TOTAL"] = df["ULTIMO_SALARIO"].fillna(0.0) + df["OUTRA_RENDA_VALOR"].fillna(0.0)
+print(df["RENDA_TOTAL"].describe().to_string())
 
-df.groupBy(F.round(F.col("RENDA_TOTAL"), -2).alias("RENDA_TOTAL_FAIXA")).count().orderBy(F.col("RENDA_TOTAL_FAIXA")).show(10)
-
-df = df.withColumn(
-    "CATEGORIA_RENDA",
-    F.when(F.col("RENDA_TOTAL") <= 2500, "Baixa")
-     .when(F.col("RENDA_TOTAL") <= 5000, "Média-Baixa")
-     .when(F.col("RENDA_TOTAL") <= 10000, "Média")
-     .when(F.col("RENDA_TOTAL") <= 20000, "Média-Alta")
-     .otherwise("Alta")
+faixas_renda = (
+    df.groupby(df["RENDA_TOTAL"].round(-2).rename("RENDA_TOTAL_FAIXA"))
+      .size()
+      .reset_index(name="count")
+      .sort_values("RENDA_TOTAL_FAIXA")
 )
-df.groupBy("CATEGORIA_RENDA").count().show()
+print(faixas_renda.head(10).to_string(index=False))
+
+renda_condicoes = [
+    df["RENDA_TOTAL"] <= 2500,
+    df["RENDA_TOTAL"] <= 5000,
+    df["RENDA_TOTAL"] <= 10000,
+    df["RENDA_TOTAL"] <= 20000,
+]
+renda_valores = ["Baixa", "Média-Baixa", "Média", "Média-Alta"]
+df["CATEGORIA_RENDA"] = np.select(renda_condicoes, renda_valores, default="Alta")
+print(df["CATEGORIA_RENDA"].value_counts().to_string())
 
 bool_cols = ["TEM_FILHOS", "TRABALHANDO_ATUALMENTE", "CASA_PROPRIA"]
 for col in bool_cols:
-    normalized = F.upper(F.trim(F.col(col).cast("string")))
-    df = df.withColumn(
-        col,
-        F.when(normalized.isin("SIM", "TRUE", "1"), F.lit(1)).otherwise(F.lit(0))
-    )
+    normalized = df[col].astype("string").str.strip().str.upper()
+    df[col] = normalized.isin(["SIM", "TRUE", "1"]).astype(int)
 print("Colunas booleanas convertidas para indicadores numéricos.")
 
 gold_path = "data/gold/dados_gold.csv"
 write_single_csv(df, gold_path)
-print(f"Dados gerais salvos: {gold_path} (shape=({df.count()}, {len(df.columns)}))")
+print(f"Dados gerais salvos: {gold_path} (shape={df.shape})")
 
 metricas_estado = (
-    df.groupBy("UF")
+    df.groupby("UF", dropna=False)
       .agg(
-          F.count("CODIGO_CLIENTE").alias("total_clientes"),
-          F.avg("RENDA_TOTAL").alias("renda_media"),
-          F.avg("SCORE").alias("score_medio"),
-          F.avg("QT_IMOVEIS").alias("media_imoveis"),
-          F.avg("QT_CARROS").alias("media_carros"),
-          F.avg("TEM_FILHOS").alias("percentual_com_filhos")
+          total_clientes=("CODIGO_CLIENTE", "count"),
+          renda_media=("RENDA_TOTAL", "mean"),
+          score_medio=("SCORE", "mean"),
+          media_imoveis=("QT_IMOVEIS", "mean"),
+          media_carros=("QT_CARROS", "mean"),
+          percentual_com_filhos=("TEM_FILHOS", "mean"),
       )
-      .withColumn("percentual_com_filhos", F.col("percentual_com_filhos") * 100)
-      .orderBy("UF")
+      .reset_index()
+      .sort_values("UF")
 )
+metricas_estado["percentual_com_filhos"] = metricas_estado["percentual_com_filhos"] * 100
 write_single_csv(metricas_estado, "data/gold/metricas_estado.csv")
-metricas_estado.show(5, truncate=False)
+print(metricas_estado.head().to_string(index=False))
 
-analise_clientes = (
-    df.select(
-        "CODIGO_CLIENTE", "IDADE", "FAIXA_ETARIA", "RENDA_TOTAL",
-        "CATEGORIA_RENDA", "SCORE", "QT_IMOVEIS", "QT_CARROS",
-        "ULTIMO_SALARIO", "TRABALHANDO_ATUALMENTE"
-    )
-    .withColumn(
-        "capacidade_credito",
-        F.coalesce(F.col("RENDA_TOTAL"), F.lit(0.0)) * F.lit(0.3) + F.coalesce(F.col("SCORE"), F.lit(0.0)) * F.lit(10)
-    )
+analise_clientes = df[[
+    "CODIGO_CLIENTE", "IDADE", "FAIXA_ETARIA", "RENDA_TOTAL",
+    "CATEGORIA_RENDA", "SCORE", "QT_IMOVEIS", "QT_CARROS",
+    "ULTIMO_SALARIO", "TRABALHANDO_ATUALMENTE"
+]].copy()
+analise_clientes["capacidade_credito"] = (
+    analise_clientes["RENDA_TOTAL"].fillna(0.0) * 0.3 + analise_clientes["SCORE"].fillna(0.0) * 10
 )
 write_single_csv(analise_clientes, "data/gold/analise_clientes.csv")
 
 ativos = (
-    df.groupBy("FAIXA_ETARIA")
+    df.groupby("FAIXA_ETARIA", dropna=False)
       .agg(
-          F.avg("QT_IMOVEIS").alias("media_qt_imoveis"),
-          F.avg("VL_IMOVEIS").alias("media_valor_imoveis"),
-          F.avg("QT_CARROS").alias("media_qt_carros"),
-          F.avg("VALOR_TABELA_CARROS").alias("media_valor_carros"),
-          F.avg("RENDA_TOTAL").alias("renda_media"),
-          F.avg("SCORE").alias("score_medio")
+          media_qt_imoveis=("QT_IMOVEIS", "mean"),
+          media_valor_imoveis=("VL_IMOVEIS", "mean"),
+          media_qt_carros=("QT_CARROS", "mean"),
+          media_valor_carros=("VALOR_TABELA_CARROS", "mean"),
+          renda_media=("RENDA_TOTAL", "mean"),
+          score_medio=("SCORE", "mean"),
       )
-      .orderBy("FAIXA_ETARIA")
+      .reset_index()
+      .sort_values("FAIXA_ETARIA")
 )
 write_single_csv(ativos, "data/gold/ativos_patrimonio.csv")
 
-df.show(5, truncate=False)
+print(df.head().to_string())
 
 print("Agregações criadas e salvas na camada Gold")

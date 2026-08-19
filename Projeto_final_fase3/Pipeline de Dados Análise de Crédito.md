@@ -126,7 +126,7 @@ print(score_faixas)
 ## Arquitetura
 
 ### Processamento
-- Apache Spark: processamento distribuído
+- pandas: processamento em memória
 - Parquet: formato de armazenamento
 - Camadas: Bronze/Silver/Gold
 
@@ -155,12 +155,12 @@ print(score_faixas)
 
 ## Como Executar
 
-### 1. Processar com Spark
+### 1. Processar com pandas
 ```bash
 # Executar notebooks na ordem
-01_spark_bronze_layer.ipynb
-02_spark_silver_layer.ipynb
-03_spark_gold_layer.ipyn
+01_bronze_layer.ipynb
+02_silver_layer.ipynb
+03_gold_layer.ipynb
 ```
 
 ### 2. Carregar no Banco

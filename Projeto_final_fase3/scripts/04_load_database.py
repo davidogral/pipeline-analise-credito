@@ -1,22 +1,21 @@
-from spark_utils import get_spark
+import sys as _sys
+from pathlib import Path as _Path
+
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from pandas_utils import read_layer_csv
 from db_utils import get_pg_connection, persist_dataframe, list_tables
 
-spark = get_spark("PostgresLoad")
 conn = get_pg_connection()
 print("Conexão com banco de dados PostgreSQL estabelecida")
 
-df_limpo = (
-    spark.read
-    .option("header", True)
-    .option("inferSchema", True)
-    .csv("data/silver/dados_limpos.csv")
-)
-print(f"Dados Silver carregados: {df_limpo.count()} registros")
+df_limpo = read_layer_csv("data/silver/dados_limpos.csv")
+print(f"Dados Silver carregados: {len(df_limpo)} registros")
 
 persist_dataframe(df_limpo, "projeto_final", conn)
 
-metricas = spark.read.option("header", True).option("inferSchema", True).csv("data/gold/metricas_estado.csv")
-ativos = spark.read.option("header", True).option("inferSchema", True).csv("data/gold/ativos_patrimonio.csv")
+metricas = read_layer_csv("data/gold/metricas_estado.csv")
+ativos = read_layer_csv("data/gold/ativos_patrimonio.csv")
 
 persist_dataframe(metricas, "metricas_estado", conn)
 persist_dataframe(ativos, "ativos_patrimonio", conn)
