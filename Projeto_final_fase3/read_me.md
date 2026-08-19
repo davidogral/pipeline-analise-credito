@@ -2,6 +2,8 @@
 
 Instruções completas para reproduzir o pipeline (Spark), carregar os dados no PostgreSQL e, opcionalmente, orquestrar com Airflow no VS Code.
 
+> Esta é a branch `spark`, que roda com **PySpark** (requer Java 17). A mesma pipeline implementada em **pandas puro** está na branch `main`.
+
 ## Estrutura do repositório
 - `data/raw/dados_credito.xlsx`: fonte original.
 - `data/bronze | silver | gold`: saídas das camadas.
