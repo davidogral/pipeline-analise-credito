@@ -1,4 +1,4 @@
-.PHONY: help install db-up db-down run run-local analytics ml test lint format airflow-up clean
+.PHONY: help install db-up db-down run run-local analytics ml test lint format airflow-up databricks-deploy databricks-run clean
 
 PYTHON ?= python3
 
@@ -39,6 +39,16 @@ format: ## Formata o código
 
 airflow-up: ## Sobe Airflow (com Java) + PostgreSQL em http://localhost:8080 (admin/admin)
 	docker compose --profile airflow up -d --build
+
+VOLUME ?= /Volumes/workspace/bronze/arquivos
+
+databricks-deploy: ## Publica schemas, volume, wheel e job no Databricks e envia o arquivo de origem
+	databricks bundle deploy
+	databricks fs mkdir dbfs:$(VOLUME)/raw
+	databricks fs cp data/raw/dados_credito.xlsx dbfs:$(VOLUME)/raw/dados_credito.xlsx --overwrite
+
+databricks-run: ## Executa o job pipeline_credito no Databricks
+	databricks bundle run pipeline_credito
 
 clean: ## Remove as saídas geradas
 	rm -rf data/bronze data/silver data/gold data/reports spark-warehouse metastore_db derby.log .pytest_cache .ruff_cache

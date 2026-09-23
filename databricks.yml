@@ -1,0 +1,113 @@
+# Databricks Asset Bundle: infraestrutura e orquestração do pipeline como código.
+#
+#   databricks bundle deploy   # cria schemas, volume e job, e publica o wheel
+#   databricks bundle run pipeline_credito
+#
+# Veja a seção "Rodando no Databricks" do README.
+
+bundle:
+  name: pipeline-analise-credito
+
+variables:
+  catalog:
+    description: Catálogo do Unity Catalog onde ficam os schemas bronze, silver e gold
+    default: workspace
+
+artifacts:
+  credit_pipeline:
+    type: whl
+    build: uv build --wheel
+    path: .
+
+resources:
+  schemas:
+    bronze:
+      catalog_name: ${var.catalog}
+      name: bronze
+      comment: Dados brutos com histórico de ingestões (append-only)
+    silver:
+      catalog_name: ${var.catalog}
+      name: silver
+      comment: Dados limpos, um registro por cliente (MERGE)
+    gold:
+      catalog_name: ${var.catalog}
+      name: gold
+      comment: Features, agregações de negócio e auditoria de qualidade
+
+  volumes:
+    arquivos:
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.bronze.name}
+      name: arquivos
+      volume_type: MANAGED
+      comment: Arquivo de origem (raw/) e relatórios de qualidade (reports/)
+
+  jobs:
+    pipeline_credito:
+      name: pipeline_credito
+      description: Ingestão, tratamento, validação e análise dos dados de crédito
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: America/Sao_Paulo
+        # Pausado para não consumir a cota do plano gratuito; ative na UI ou mude para UNPAUSED.
+        pause_status: PAUSED
+      tags:
+        projeto: credito
+        camada: medallion
+
+      environments:
+        - environment_key: default
+          spec:
+            # Versão 4 (Spark 4): necessária para o pyspark.ml via Spark Connect no serverless.
+            environment_version: "4"
+            dependencies:
+              - ./dist/*.whl
+
+      tasks:
+        - task_key: bronze
+          environment_key: default
+          python_wheel_task: &wheel
+            package_name: credit_pipeline
+            entry_point: credit-pipeline
+            parameters: [--storage, delta, --catalog, "${var.catalog}", --data-dir, "/Volumes/${var.catalog}/bronze/arquivos", run, --steps, bronze]
+
+        - task_key: silver
+          depends_on: [{task_key: bronze}]
+          environment_key: default
+          python_wheel_task:
+            <<: *wheel
+            parameters: [--storage, delta, --catalog, "${var.catalog}", --data-dir, "/Volumes/${var.catalog}/bronze/arquivos", run, --steps, silver]
+
+        - task_key: gold
+          depends_on: [{task_key: silver}]
+          environment_key: default
+          python_wheel_task:
+            <<: *wheel
+            parameters: [--storage, delta, --catalog, "${var.catalog}", --data-dir, "/Volumes/${var.catalog}/bronze/arquivos", run, --steps, gold]
+
+        - task_key: quality
+          depends_on: [{task_key: gold}]
+          environment_key: default
+          python_wheel_task:
+            <<: *wheel
+            parameters: [--storage, delta, --catalog, "${var.catalog}", --data-dir, "/Volumes/${var.catalog}/bronze/arquivos", run, --steps, quality]
+
+        # Só rodam se o quality gate passar.
+        - task_key: analytics
+          depends_on: [{task_key: quality}]
+          environment_key: default
+          python_wheel_task:
+            <<: *wheel
+            parameters: [--storage, delta, --catalog, "${var.catalog}", --data-dir, "/Volumes/${var.catalog}/bronze/arquivos", analytics]
+
+        - task_key: ml
+          depends_on: [{task_key: quality}]
+          environment_key: default
+          python_wheel_task:
+            <<: *wheel
+            parameters: [--storage, delta, --catalog, "${var.catalog}", --data-dir, "/Volumes/${var.catalog}/bronze/arquivos", ml]
+
+targets:
+  dev:
+    default: true

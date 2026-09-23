@@ -16,8 +16,9 @@ from pyspark.ml.regression import LinearRegression
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from credit_pipeline.config import Paths
+from credit_pipeline.config import Paths, gold
 from credit_pipeline.io import read_layer
+from credit_pipeline.spark import cache
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def evaluate(predictions: DataFrame, prediction_col: str = "prediction") -> dict
 
 def train(df: DataFrame) -> tuple[PipelineModel, dict]:
     train_df, test_df = prepare(df).randomSplit([1 - TEST_SIZE, TEST_SIZE], seed=RANDOM_STATE)
-    train_df, test_df = train_df.cache(), test_df.cache()
+    train_df, test_df = cache(train_df), cache(test_df)
 
     model = build_model().fit(train_df)
     predictions = model.transform(test_df)
@@ -93,7 +94,7 @@ def train(df: DataFrame) -> tuple[PipelineModel, dict]:
 
 
 def run(paths: Paths) -> dict:
-    _, metrics = train(read_layer(paths.gold_dir / "dados_gold"))
+    _, metrics = train(read_layer(paths, gold("dados_gold")))
     paths.reports_dir.mkdir(parents=True, exist_ok=True)
     (paths.reports_dir / "ml_metrics.json").write_text(json.dumps(metrics, indent=2))
     logger.info("ML: modelo %s | baseline %s", metrics["modelo"], metrics["baseline_media"])

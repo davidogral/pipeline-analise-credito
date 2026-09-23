@@ -35,3 +35,7 @@ Projeto_final_fase3/
 .DS_Store
 .vscode/
 .idea/
+
+# Databricks
+.databricks/
+dist/

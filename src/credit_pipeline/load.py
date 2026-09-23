@@ -11,8 +11,7 @@ from __future__ import annotations
 
 import logging
 
-from credit_pipeline.config import Paths, PostgresSettings
-from credit_pipeline.db import get_pg_connection, list_tables, replace_table
+from credit_pipeline.config import SILVER, Paths, PostgresSettings, gold
 from credit_pipeline.io import read_layer
 
 logger = logging.getLogger(__name__)
@@ -23,14 +22,17 @@ PK_CLIENTE = "codigo_cliente"
 def tables_to_load(paths: Paths) -> dict:
     """Tabelas publicadas no banco, lidas das camadas Silver e Gold."""
     return {
-        "clientes_credito": read_layer(paths.silver_path),
-        "analise_clientes": read_layer(paths.gold_dir / "analise_clientes"),
-        "metricas_estado": read_layer(paths.gold_dir / "metricas_estado"),
-        "ativos_patrimonio": read_layer(paths.gold_dir / "ativos_patrimonio"),
+        "clientes_credito": read_layer(paths, SILVER),
+        "analise_clientes": read_layer(paths, gold("analise_clientes")),
+        "metricas_estado": read_layer(paths, gold("metricas_estado")),
+        "ativos_patrimonio": read_layer(paths, gold("ativos_patrimonio")),
     }
 
 
 def run(paths: Paths, settings: PostgresSettings | None = None) -> dict[str, int]:
+    # Import tardio: o driver só é necessário (e instalado, via extra [postgres]) quando há carga no banco.
+    from credit_pipeline.db import get_pg_connection, list_tables, replace_table
+
     tables = {name: df.toPandas() for name, df in tables_to_load(paths).items()}
     loaded: dict[str, int] = {}
 

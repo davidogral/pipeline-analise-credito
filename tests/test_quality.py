@@ -2,6 +2,7 @@ import pytest
 from pyspark.sql import functions as F
 
 from credit_pipeline import quality
+from credit_pipeline.config import gold
 from credit_pipeline.gold import build_features
 from credit_pipeline.io import write_layer
 from credit_pipeline.silver import transform
@@ -39,7 +40,7 @@ def test_detecta_uf_invalida(gold_df):
 
 def test_quality_gate_bloqueia_carga(pipeline_paths, gold_df):
     df = gold_df.withColumn("SCORE", F.when(F.col("CODIGO_CLIENTE") == 1, None).otherwise(F.col("SCORE")))
-    write_layer(df, pipeline_paths.gold_dir / "dados_gold")
+    write_layer(df, pipeline_paths, gold("dados_gold"))
     with pytest.raises(quality.QualityGateError):
         quality.run(pipeline_paths)
     assert (pipeline_paths.reports_dir / "quality_report.json").exists()

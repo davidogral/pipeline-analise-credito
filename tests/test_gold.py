@@ -34,7 +34,7 @@ def test_categoria_renda_nos_limites(spark, renda, categoria):
 
 @pytest.fixture
 def gold_df(bronze_df):
-    return build_features(transform(bronze_df)).cache()
+    return build_features(transform(bronze_df))
 
 
 def test_capacidade_de_credito(gold_df):

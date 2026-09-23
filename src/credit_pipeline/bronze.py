@@ -10,7 +10,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
-from credit_pipeline.config import Paths
+from credit_pipeline.config import BRONZE, Paths
 from credit_pipeline.io import write_layer
 from credit_pipeline.spark import get_spark
 
@@ -84,6 +84,8 @@ def extract(raw_file: Path) -> DataFrame:
 
 def run(paths: Paths) -> DataFrame:
     df = extract(paths.raw_file)
-    write_layer(df, paths.bronze_path)
-    logger.info("Bronze: %d colunas -> %s", len(df.columns), paths.bronze_path)
+    # No Delta a Bronze é append-only: cada ingestão fica registrada, identificada por DATA_UPLOAD.
+    mode = "append" if paths.storage == "delta" else "overwrite"
+    target = write_layer(df, paths, BRONZE, mode=mode)
+    logger.info("Bronze: %d colunas -> %s (%s)", len(df.columns), target, mode)
     return df

@@ -6,6 +6,9 @@ Exemplos:
     credit-pipeline run --steps bronze silver
     credit-pipeline analytics --engine postgres
     credit-pipeline ml
+
+    # No Databricks: camadas como tabelas Delta no Unity Catalog
+    credit-pipeline --storage delta --catalog workspace --data-dir /Volumes/workspace/bronze/arquivos run --skip-load
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ import logging
 import time
 
 from credit_pipeline import analytics, bronze, gold, load, ml, quality, silver
-from credit_pipeline.config import Paths
+from credit_pipeline.config import STORAGES, Paths
 
 STEPS = {
     "bronze": bronze.run,
@@ -37,6 +40,10 @@ def run_steps(steps: list[str], paths: Paths) -> None:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="credit-pipeline", description="Pipeline de dados de análise de crédito")
+    # Também podem vir de PIPELINE_STORAGE, PIPELINE_CATALOG e PIPELINE_DATA_DIR.
+    parser.add_argument("--storage", choices=STORAGES, help="parquet (local, padrão) ou delta (Unity Catalog)")
+    parser.add_argument("--catalog", help="catálogo do Unity Catalog no modo delta (padrão: workspace)")
+    parser.add_argument("--data-dir", help="pasta com raw/ e reports/ (no Databricks, um Volume)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run_parser = sub.add_parser("run", help="executa as etapas do pipeline")
@@ -50,7 +57,7 @@ def main(argv: list[str] | None = None) -> None:
 
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s | %(message)s")
-    paths = Paths.from_env()
+    paths = Paths.from_env(data_dir=args.data_dir, storage=args.storage, catalog=args.catalog)
 
     if args.command == "run":
         steps = [s for s in args.steps if not (args.skip_load and s == "load")]

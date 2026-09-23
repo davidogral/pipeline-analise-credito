@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 import matplotlib
@@ -22,8 +23,9 @@ import matplotlib.pyplot as plt  # noqa: E402
 from pyspark.sql import Column, DataFrame  # noqa: E402
 from pyspark.sql import functions as F  # noqa: E402
 
-from credit_pipeline.config import Paths  # noqa: E402
-from credit_pipeline.io import read_layer  # noqa: E402
+from credit_pipeline.config import Paths, gold  # noqa: E402
+from credit_pipeline.io import read_layer, write_layer  # noqa: E402
+from credit_pipeline.spark import cache, get_spark  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -128,10 +130,23 @@ def plot_completeness(completeness: dict[str, float], output_file: Path) -> None
     plt.close(fig)
 
 
+def record_results(paths: Paths, results: list[CheckResult]) -> None:
+    """No Delta, registra cada execução em gold.qualidade_execucoes para auditoria e tendência."""
+    executado_em = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows = [(executado_em, r.rule, r.column, r.severity, r.failed_rows, r.passed) for r in results]
+    schema = (
+        "executado_em timestamp, regra string, coluna string, severidade string, "
+        "linhas_com_falha long, aprovada boolean"
+    )
+    write_layer(get_spark().createDataFrame(rows, schema), paths, gold("qualidade_execucoes"), mode="append")
+
+
 def run(paths: Paths) -> dict:
-    df = read_layer(paths.gold_dir / "dados_gold").cache()
+    df = cache(read_layer(paths, gold("dados_gold")))
     results, stats = run_checks(df)
     report = summarize(df, results, stats)
+    if paths.storage == "delta":
+        record_results(paths, results)
 
     paths.reports_dir.mkdir(parents=True, exist_ok=True)
     (paths.reports_dir / "quality_report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False))

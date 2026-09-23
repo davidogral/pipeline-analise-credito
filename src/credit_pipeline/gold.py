@@ -7,8 +7,9 @@ import logging
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
 
-from credit_pipeline.config import Paths
+from credit_pipeline.config import SILVER, Paths, gold
 from credit_pipeline.io import read_layer, write_layer
+from credit_pipeline.spark import cache
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ def ativos_por_faixa_etaria(df: DataFrame) -> DataFrame:
 
 def run(paths: Paths) -> dict[str, DataFrame]:
     # cache: a base de features é lida por três agregações diferentes.
-    df = build_features(read_layer(paths.silver_path)).cache()
+    df = cache(build_features(read_layer(paths, SILVER)))
     outputs = {
         "dados_gold": df,
         "metricas_estado": metricas_por_estado(df),
@@ -111,6 +112,6 @@ def run(paths: Paths) -> dict[str, DataFrame]:
     }
     for name, table in outputs.items():
         # As agregações são pequenas: uma partição evita dezenas de arquivos minúsculos.
-        write_layer(table if name in ("dados_gold", "analise_clientes") else table.coalesce(1), paths.gold_dir / name)
-        logger.info("Gold: %s -> %s", name, paths.gold_dir / name)
+        table = table if name in ("dados_gold", "analise_clientes") else table.coalesce(1)
+        logger.info("Gold: %s -> %s", name, write_layer(table, paths, gold(name)))
     return outputs

@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from delta import configure_spark_with_delta_pip
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import types as T
 
@@ -11,15 +12,19 @@ from credit_pipeline.config import PROJECT_ROOT, Paths
 
 
 @pytest.fixture(scope="session")
-def spark() -> SparkSession:
-    session = (
+def spark(tmp_path_factory) -> SparkSession:
+    # Delta habilitado para testar localmente o modo usado no Databricks (tabelas, MERGE, histórico).
+    builder = (
         SparkSession.builder.master("local[2]")
         .appName("credit-pipeline-tests")
         .config("spark.sql.shuffle.partitions", "2")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.session.timeZone", "UTC")
-        .getOrCreate()
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .config("spark.sql.warehouse.dir", str(tmp_path_factory.mktemp("warehouse")))
     )
+    session = configure_spark_with_delta_pip(builder).getOrCreate()
     yield session
     session.stop()
 

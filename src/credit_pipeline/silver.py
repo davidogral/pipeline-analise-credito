@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import logging
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
-from credit_pipeline.config import Paths
+from credit_pipeline.config import BRONZE, SILVER, Paths
 from credit_pipeline.io import read_layer, write_layer
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,15 @@ MAX_QT_FILHOS = 3
 
 def transform(df: DataFrame) -> DataFrame:
     """Aplica todas as regras da camada Silver."""
+    # A Bronze pode ter várias ingestões do mesmo cliente: fica só a mais recente.
+    # Registros sem chave são mantidos para o quality gate acusar o problema.
+    mais_recente = Window.partitionBy("CODIGO_CLIENTE").orderBy(F.col("DATA_UPLOAD").desc())
+    df = (
+        df.withColumn("_ordem", F.row_number().over(mais_recente))
+        .filter((F.col("_ordem") == 1) | F.col("CODIGO_CLIENTE").isNull())
+        .drop("_ordem")
+    )
+
     for col in BOOLEAN_COLUMNS:
         cleaned = F.upper(F.trim(F.col(col)))
         df = df.withColumn(
@@ -61,7 +70,8 @@ def transform(df: DataFrame) -> DataFrame:
 
 
 def run(paths: Paths) -> DataFrame:
-    df = transform(read_layer(paths.bronze_path))
-    write_layer(df, paths.silver_path)
-    logger.info("Silver: -> %s", paths.silver_path)
+    df = transform(read_layer(paths, BRONZE))
+    # No Delta, upsert por cliente: atualiza quem mudou e insere quem é novo.
+    target = write_layer(df, paths, SILVER, merge_keys=["CODIGO_CLIENTE"])
+    logger.info("Silver: -> %s", target)
     return df

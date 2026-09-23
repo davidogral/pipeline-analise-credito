@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pyspark.sql import functions as F
 
 from credit_pipeline.silver import transform
@@ -33,3 +35,14 @@ def test_calcula_renda_total(bronze_df):
 
 def test_remove_duplicatas(bronze_df):
     assert transform(bronze_df.unionByName(bronze_df.limit(1))).count() == bronze_df.count()
+
+
+def test_mantem_a_ingestao_mais_recente_de_cada_cliente(bronze_df):
+    nova_ingestao = (
+        bronze_df.filter("CODIGO_CLIENTE = 1")
+        .withColumn("DATA_UPLOAD", F.lit(datetime(2025, 2, 1)))
+        .withColumn("SCORE", F.lit(77.0))
+    )
+    rows = rows_by_id(transform(bronze_df.unionByName(nova_ingestao)))
+    assert len(rows) == 3
+    assert rows[1].SCORE == 77

@@ -62,3 +62,19 @@ Executadas sobre a Gold antes da carga. Regras `error` bloqueiam a publicação 
 | Outra renda com valor | quem declara `OUTRA_RENDA` deve ter `OUTRA_RENDA_VALOR > 0` | warning |
 
 O resultado de cada execução é salvo em `data/reports/quality_report.json`.
+
+## Tabelas no Databricks (Unity Catalog)
+
+No modo `--storage delta`, as camadas viram tabelas Delta no catálogo configurado (padrão `workspace`):
+
+| Tabela | Escrita | Grão |
+| --- | --- | --- |
+| `bronze.dados_brutos` | append | 1 linha por cliente por ingestão (`DATA_UPLOAD`) |
+| `silver.dados_limpos` | `MERGE` por `CODIGO_CLIENTE` | 1 linha por cliente (ingestão mais recente) |
+| `gold.dados_gold`, `gold.analise_clientes` | overwrite | 1 linha por cliente |
+| `gold.metricas_estado` | overwrite | 1 linha por UF |
+| `gold.ativos_patrimonio` | overwrite | 1 linha por faixa etária |
+| `gold.qualidade_execucoes` | append | 1 linha por regra por execução |
+
+`gold.qualidade_execucoes` tem as colunas `executado_em`, `regra`, `coluna`, `severidade`, `linhas_com_falha` e
+`aprovada`. As execuções reprovadas também são registradas antes de o pipeline ser interrompido.
