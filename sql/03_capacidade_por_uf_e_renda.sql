@@ -15,6 +15,6 @@ SELECT
     categoria_renda,
     total_clientes,
     ROUND(100.0 * total_clientes / SUM(total_clientes) OVER (PARTITION BY uf), 2) AS pct_clientes_uf,
-    ROUND(CAST(capacidade_media AS NUMERIC), 2) AS capacidade_media
+    ROUND(CAST(capacidade_media AS DECIMAL(18, 4)), 2) AS capacidade_media
 FROM segmentos
 ORDER BY uf, posicao;

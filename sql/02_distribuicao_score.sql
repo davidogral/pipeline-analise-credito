@@ -7,7 +7,7 @@ SELECT
         ELSE '4. Excelente (75-100)'
     END AS faixa_score,
     COUNT(*) AS total_clientes,
-    ROUND(CAST(AVG(renda_total) AS NUMERIC), 2) AS renda_media
+    ROUND(CAST(AVG(renda_total) AS DECIMAL(18, 4)), 2) AS renda_media
 FROM clientes_credito
 GROUP BY 1
 ORDER BY 1;

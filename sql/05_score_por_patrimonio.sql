@@ -3,7 +3,7 @@ SELECT
     qt_imoveis,
     qt_carros,
     COUNT(*) AS total_clientes,
-    ROUND(CAST(AVG(score) AS NUMERIC), 2) AS score_medio
+    ROUND(CAST(AVG(score) AS DECIMAL(18, 4)), 2) AS score_medio
 FROM clientes_credito
 GROUP BY qt_imoveis, qt_carros
 HAVING COUNT(*) >= 30
