@@ -108,6 +108,10 @@ O [`databricks.yml`](databricks.yml) é um **Databricks Asset Bundle**: descreve
 `silver` e `gold`, o volume com o arquivo de origem e o job `pipeline_credito`, que roda em **compute serverless**
 empacotando o projeto como wheel.
 
+<p align="center">
+  <img src="docs/img/databricks_job.png" alt="Execução do job pipeline_credito no Databricks com as 6 tarefas concluídas" width="90%">
+</p>
+
 ```mermaid
 flowchart LR
     V[(Volume<br/>raw/dados_credito.xlsx)] --> B[bronze<br/>append]
@@ -125,6 +129,13 @@ flowchart LR
 | `silver.dados_limpos` | **`MERGE INTO`** por `CODIGO_CLIENTE` | Fica a versão mais recente de cada cliente: atualiza quem mudou e insere quem é novo |
 | `gold.*` | overwrite | Agregações derivadas da Silver inteira |
 | `gold.qualidade_execucoes` | append | Resultado de cada regra em cada execução, inclusive as reprovadas: auditoria e tendência de qualidade |
+
+O Unity Catalog registra a linhagem automaticamente: a tabela `gold.analise_clientes` aparece ligada à
+`silver.dados_limpos` e ao job que a produziu.
+
+<p align="center">
+  <img src="docs/img/databricks_lineage.png" alt="Linhagem da tabela gold.analise_clientes no Unity Catalog" width="90%">
+</p>
 
 Como o Delta Lake versiona as tabelas, qualquer carga pode ser inspecionada ou revertida com `DESCRIBE HISTORY` e
 `RESTORE TABLE ... TO VERSION AS OF`.
