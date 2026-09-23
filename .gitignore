@@ -1,1 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Ambiente
+.env
+
+# Saídas geradas pelo pipeline (reproduzíveis com `make run`)
+data/bronze/
+data/silver/
+data/gold/
+data/reports/
+
+# Spark
+spark-warehouse/
+metastore_db/
+derby.log
+
+# Airflow local
+airflow_home/
+logs/
+
+# Pasta legada da versão anterior do projeto
+Projeto_final_fase3/
+
+# SO / editores
 .DS_Store
+.vscode/
+.idea/
