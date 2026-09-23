@@ -5,6 +5,7 @@
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
 ![Airflow](https://img.shields.io/badge/Airflow-2.10-017CEE?logo=apacheairflow&logoColor=white)
 ![PySpark](https://img.shields.io/badge/PySpark-branch%20spark-E25A1C?logo=apachespark&logoColor=white)
+![Databricks](https://img.shields.io/badge/Databricks-branch%20spark-FF3621?logo=databricks&logoColor=white)
 
 Pipeline de dados de ponta a ponta para análise de crédito: ingere a base de solicitantes de cartão, trata e valida
 os dados em uma **arquitetura medalhão (Bronze → Silver → Gold)**, bloqueia a publicação se as regras de qualidade
@@ -13,7 +14,8 @@ Sobre a camada Gold, consultas SQL analíticas e um modelo de regressão estimam
 
 > **Duas implementações, mesma arquitetura.** A `main` usa **pandas**. A branch
 > [`spark`](https://github.com/davidogral/pipeline-analise-credito/tree/spark) é a primeira versão do projeto e
-> implementa o mesmo pipeline em **PySpark** (Spark SQL e `pyspark.ml`), com saídas equivalentes.
+> implementa o mesmo pipeline em **PySpark** (Spark SQL e `pyspark.ml`), com saídas equivalentes, e roda no
+> **Databricks** como job serverless, com tabelas **Delta** no **Unity Catalog**, `MERGE` e auditoria de qualidade.
 
 ## Problema de negócio
 
@@ -167,7 +169,6 @@ categoria de renda criada na Gold é a variável mais importante do modelo:
 
 ## Próximos passos
 
-- Migrar o armazenamento das camadas para **Delta Lake** / Parquet e rodar a versão PySpark no **Databricks**.
 - Carga incremental (upsert por `CODIGO_CLIENTE`) em vez de recriar as tabelas.
 - Monitoramento de drift e retreino do modelo, com validação cruzada e um modelo não linear.
 
